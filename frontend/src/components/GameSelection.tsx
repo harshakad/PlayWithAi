@@ -1,7 +1,12 @@
 import React from 'react';
 import './GameSelection.css';
+import { GameType } from '../App';
 
-const GameSelection = ({ onSelectGame }) => {
+interface GameSelectionProps {
+  onSelectGame: (game: GameType) => void;
+}
+
+const GameSelection: React.FC<GameSelectionProps> = ({ onSelectGame }) => {
   return (
     <div className="selection-container">
       <h1 className="selection-title">Choose Your Game</h1>

@@ -1,15 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as signalR from '@microsoft/signalr';
-import Board, { generateInitialBoard } from './Board';
+import Board, { generateInitialBoard, GamePiece } from './Board';
 import './GameRoom.css';
+import { GameType } from '../App';
 
-const GameRoom = ({ gameType, onBack }) => {
-  const [messages, setMessages] = useState([
+interface GameRoomProps {
+  gameType: GameType;
+  onBack: () => void;
+}
+
+interface Message {
+  id: number;
+  sender: 'system' | 'self' | 'opponent';
+  text: string;
+}
+
+const GameRoom: React.FC<GameRoomProps> = ({ gameType, onBack }) => {
+  const [messages, setMessages] = useState<Message[]>([
     { id: 1, sender: 'system', text: 'Welcome to the room! Waiting for opponent...' }
   ]);
   const [inputText, setInputText] = useState('');
-  const [boardState, setBoardState] = useState(generateInitialBoard(gameType));
-  const [connection, setConnection] = useState(null);
+  const [boardState, setBoardState] = useState<(GamePiece | null)[][]>(generateInitialBoard(gameType));
+  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
   const roomId = 'test-room-1'; // Hardcoded for demo, normally dynamic
 
   // Setup SignalR connection
@@ -34,15 +46,15 @@ const GameRoom = ({ gameType, onBack }) => {
           console.log('Connected to server!');
           connection.invoke('JoinRoom', roomId);
 
-          connection.on('UserJoined', (msg) => {
+          connection.on('UserJoined', (_msg: any) => {
             setMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: `A user has joined the room.` }]);
           });
 
-          connection.on('ReceiveMessage', (sender, message) => {
+          connection.on('ReceiveMessage', (sender: string, message: string) => {
             setMessages(prev => [...prev, { id: Date.now(), sender: sender === connection.connectionId ? 'self' : 'opponent', text: message }]);
           });
 
-          connection.on('ReceiveMove', (moveData) => {
+          connection.on('ReceiveMove', (moveData: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number }) => {
             // Apply opponent's move locally
             applyMoveLocally(moveData.sourceRow, moveData.sourceCol, moveData.targetRow, moveData.targetCol);
           });
@@ -51,7 +63,7 @@ const GameRoom = ({ gameType, onBack }) => {
     }
   }, [connection]);
 
-  const applyMoveLocally = (sourceRow, sourceCol, targetRow, targetCol) => {
+  const applyMoveLocally = (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => {
     setBoardState(prevBoard => {
       const newBoard = prevBoard.map(row => [...row]);
       newBoard[targetRow][targetCol] = newBoard[sourceRow][sourceCol];
@@ -60,7 +72,7 @@ const GameRoom = ({ gameType, onBack }) => {
     });
   };
 
-  const handleMove = (sourceRow, sourceCol, targetRow, targetCol) => {
+  const handleMove = (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => {
     // 1. Move locally
     applyMoveLocally(sourceRow, sourceCol, targetRow, targetCol);
     // 2. Broadcast via SignalR
@@ -70,7 +82,7 @@ const GameRoom = ({ gameType, onBack }) => {
     }
   };
 
-  const handleSend = (e) => {
+  const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     

@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import GameSelection from './components/GameSelection';
 import GameRoom from './components/GameRoom';
 import './App.css';
 
+export type GameType = 'chess' | 'checkers';
+
 function App() {
 
-  const [gameSelectionState, setGameSelectionState] = useState(null);
+  const [gameSelectionState, setGameSelectionState] = useState<GameType | null>(null);
 
   return (
     <div className="app-container">
