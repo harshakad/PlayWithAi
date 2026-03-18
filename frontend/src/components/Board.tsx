@@ -10,7 +10,7 @@ export abstract class GamePiece {
     this.type = type;
   }
   abstract getCloneStyle(_computedStyle: CSSStyleDeclaration): React.CSSProperties;
-  abstract renderContent(_row: number, _col: number, _handleDragStart: (e: React.DragEvent, row: number, col: number) => void): React.ReactNode;
+  abstract renderContent(_row: number, _col: number, _handleDragStart: (e: React.DragEvent, row: number, col: number) => void, _canDrag: boolean): React.ReactNode;
 }
 
 class ChessPiece extends GamePiece {
@@ -32,7 +32,7 @@ class ChessPiece extends GamePiece {
       margin: '0'
     };
   }
-  override renderContent(row: number, col: number, handleDragStart: (e: React.DragEvent, row: number, col: number) => void): React.ReactNode {
+  override renderContent(row: number, col: number, handleDragStart: (e: React.DragEvent, row: number, col: number) => void, canDrag: boolean): React.ReactNode {
     return (
       <span
         draggable
@@ -40,7 +40,7 @@ class ChessPiece extends GamePiece {
         onDragEnd={(e) => { (e.target as HTMLElement).style.visibility = 'visible'; }}
         className="piece-chess"
         style={{
-          cursor: 'grab',
+          cursor: canDrag ? 'grab' : 'default',
           color: this.color === 'white' ? '#fff' : '#000',
           display: 'inline-block',
           textShadow: this.color === 'white' ? '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 4px 8px rgba(0,0,0,0.5)' : undefined
@@ -62,14 +62,14 @@ class CheckersPiece extends GamePiece {
       borderRadius: '50%'
     };
   }
-  override renderContent(row: number, col: number, handleDragStart: (e: React.DragEvent, row: number, col: number) => void): React.ReactNode {
+  override renderContent(row: number, col: number, handleDragStart: (e: React.DragEvent, row: number, col: number) => void, canDrag: boolean): React.ReactNode {
     return (
       <div
         draggable
         onDragStart={(e) => handleDragStart(e, row, col)}
         onDragEnd={(e) => { (e.target as HTMLElement).style.visibility = 'visible'; }}
         className={`piece-checkers-${this.color}`}
-        style={{ cursor: 'grab' }}
+        style={{ cursor: canDrag ? 'grab' : 'default' }}
       ></div>
     );
   }
@@ -109,15 +109,22 @@ export const generateInitialBoard = (gameType: string): (GamePiece | null)[][] =
 interface BoardProps {
   boardState: (GamePiece | null)[][];
   onMove: (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => void;
+  allowedSide?: string;
 }
 
-const Board: React.FC<BoardProps> = ({ boardState, onMove }) => {
+const Board: React.FC<BoardProps> = ({ boardState, onMove, allowedSide }) => {
   const handleDragStart = (e: React.DragEvent, row: number, col: number) => {
     e.dataTransfer.setData('sourceRow', row.toString());
     e.dataTransfer.setData('sourceCol', col.toString());
 
-    // Create a drag image on the fly to avoid background ghosting
-    // and explicitly freeze its computed dimensions so it won't shrink 
+    // Prevent dragging if it's not the user's turn/piece based on role
+    const piece = boardState[row][col];
+    if (!piece || (allowedSide && piece.color !== allowedSide)) {
+      e.preventDefault();
+      return;
+    }
+
+    // Only create clone and execute styling if drag actually processed 
     const target = e.target as HTMLElement;
     const computedStyle = window.getComputedStyle(target);
     const rect = target.getBoundingClientRect();
@@ -126,13 +133,11 @@ const Board: React.FC<BoardProps> = ({ boardState, onMove }) => {
     cloned.style.position = 'absolute';
     cloned.style.top = '-9999px';
     cloned.style.left = '-9999px';
-
-    // Explicitly mirror the exact pixel size the element holds on the grid
+    
     cloned.style.width = `${rect.width}px`;
     cloned.style.height = `${rect.height}px`;
 
-    const piece = boardState[row][col];
-    if (piece && typeof piece.getCloneStyle === 'function') {
+    if (typeof piece.getCloneStyle === 'function') {
       const styles = piece.getCloneStyle(computedStyle);
       Object.assign(cloned.style, styles);
     }
@@ -175,7 +180,8 @@ const Board: React.FC<BoardProps> = ({ boardState, onMove }) => {
         const pieceData = boardState[row][col];
         let content = null;
         if (pieceData && typeof pieceData.renderContent === 'function') {
-          content = pieceData.renderContent(row, col, handleDragStart);
+          const canDrag = !allowedSide || pieceData.color === allowedSide;
+          content = pieceData.renderContent(row, col, handleDragStart, canDrag);
         }
 
         cells.push(
