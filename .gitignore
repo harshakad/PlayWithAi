@@ -1,0 +1,9 @@
+﻿backend/.vs
+backend/GamePlatform.API/bin
+backend/GamePlatform.API/obj
+backend/GamePlatform.Application/bin
+backend/GamePlatform.Application/obj
+backend/GamePlatform.Domain/bin
+backend/GamePlatform.Domain/obj
+backend/GamePlatform.Infrastructure/bin
+backend/GamePlatform.Infrastructure/obj

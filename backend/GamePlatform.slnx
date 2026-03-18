@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="GamePlatform.API/GamePlatform.API.csproj" />
+  <Project Path="GamePlatform.Application/GamePlatform.Application.csproj" />
+  <Project Path="GamePlatform.Domain/GamePlatform.Domain.csproj" />
+  <Project Path="GamePlatform.Infrastructure/GamePlatform.Infrastructure.csproj" />
+</Solution>
