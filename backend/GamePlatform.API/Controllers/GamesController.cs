@@ -1,9 +1,10 @@
-using System;
-using Microsoft.AspNetCore.Mvc;
 using GamePlatform.Domain.Enums;
+using GamePlatform.Domain.Aggregates;
+using GamePlatform.Domain.ValueObjects;
 using GamePlatform.Application.Games.Chess;
 using GamePlatform.Application.Games.Checkers;
 using GamePlatform.Application.Interfaces;
+using Microsoft.AspNetCore.Mvc;
 
 namespace GamePlatform.API.Controllers;
 
@@ -56,12 +57,28 @@ public class GamesController : ControllerBase
     [HttpPost("{id}/move")]
     public IActionResult MakeMove(Guid id, [FromQuery] GameType type, [FromBody] MoveDto dto)
     {
-        var service = GetService(type);
-        var success = service.MakeMove(id, dto.Move);
-        if (success) return Ok();
-        return BadRequest("Move failed");
+        try
+        {
+            var service = GetService(type);
+            var move = new Move(new BoardPosition(dto.SourceRow, dto.SourceCol), new BoardPosition(dto.TargetRow, dto.TargetCol));
+            var result = service.MakeMove(id, dto.PlayerName, move);
+            
+            if (result.IsSuccess) return Ok(result);
+            return BadRequest(result.ErrorMessage);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 }
 
 public class CreateGameDto { public string? Name { get; set; } }
-public class MoveDto { public string Move { get; set; } = string.Empty; }
+public class MoveDto 
+{ 
+    public string PlayerName { get; set; } = string.Empty;
+    public int SourceRow { get; set; }
+    public int SourceCol { get; set; }
+    public int TargetRow { get; set; }
+    public int TargetCol { get; set; }
+}

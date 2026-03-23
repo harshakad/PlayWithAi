@@ -1,5 +1,6 @@
-using System;
-using GamePlatform.Domain.Entities;
+using GamePlatform.Domain.Aggregates;
+using GamePlatform.Domain.Enums;
+using GamePlatform.Domain.ValueObjects;
 
 namespace GamePlatform.Application.Interfaces;
 
@@ -7,5 +8,6 @@ public interface IGameService
 {
     GameRoom CreateGame(string name);
     GameRoom GetGame(Guid id);
-    bool MakeMove(Guid id, string move);
+    void JoinRoom(Guid id, string userName, Side side);
+    MoveResult MakeMove(Guid id, string playerName, Move move);
 }

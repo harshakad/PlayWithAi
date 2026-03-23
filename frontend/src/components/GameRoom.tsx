@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import * as signalR from '@microsoft/signalr';
-import Board, { generateInitialBoard, GamePiece } from './Board';
+import { GameFactory } from './GameFactory';
+import { MoveData } from './Board';
+
 import './GameRoom.css';
 import { GameType, RoomDetails } from '../App';
 
@@ -21,9 +23,10 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
     { id: 1, sender: 'system', text: 'Welcome to the room! Waiting for opponent...' }
   ]);
   const [inputText, setInputText] = useState('');
-  const [boardState, setBoardState] = useState<(GamePiece | null)[][]>(generateInitialBoard(gameType));
+  const [pendingMove, setPendingMove] = useState<MoveData | null>(null);
+
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
-  const [currentTurn, setCurrentTurn] = useState<string>(gameType === 'chess' ? 'white' : 'black');
+  const [currentTurn, setCurrentTurn] = useState<string>('first');
   const roomId = roomDetails.roomId;
 
   // Setup SignalR connection
@@ -59,8 +62,8 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
           });
 
           connection.on('ReceiveMove', (moveData: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number }) => {
-            // Apply opponent's move locally
-            applyMoveLocally(moveData.sourceRow, moveData.sourceCol, moveData.targetRow, moveData.targetCol);
+            // Apply opponent's move via prop
+            setPendingMove({ ...moveData, id: Date.now() });
           });
 
           connection.on('ReceiveTurnUpdate', (nextTurn: string) => {
@@ -72,45 +75,20 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
     }
   }, [connection]);
 
-  const applyMoveLocally = (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => {
-    setBoardState(prevBoard => {
-      const newBoard = prevBoard.map(row => [...row]);
-      newBoard[targetRow][targetCol] = newBoard[sourceRow][sourceCol];
-      newBoard[sourceRow][sourceCol] = null;
-      return newBoard;
-    });
-  };
-
-  const handleMove = (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => {
+  const handleMoveFinished = (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => {
     if (roomDetails.role !== 'player') return;
-    if (currentTurn !== roomDetails.side) return;
-    const piece = boardState[sourceRow][sourceCol];
-    if (!piece || piece.color !== roomDetails.side) return;
-    
-    // 1. Move locally
-    applyMoveLocally(sourceRow, sourceCol, targetRow, targetCol);
-    
-    // 2. Broadcast via SignalR
+
+    // Broadcast via SignalR
     if (connection && connection.state === signalR.HubConnectionState.Connected) {
       connection.invoke('MakeMove', roomId, { sourceRow, sourceCol, targetRow, targetCol })
         .catch(err => console.error("Move failed to send", err));
-      
-      // Auto-end turn for chess
-      if (gameType === 'chess') {
-        const nextTurn = roomDetails.side === 'white' ? 'black' : 'white';
-        setCurrentTurn(nextTurn);
-        connection.invoke('EndTurn', roomId, nextTurn)
-          .catch(err => console.error("EndTurn failed to send", err));
-      }
     }
   };
 
   const endTurn = () => {
-    if (gameType !== 'checkers' || currentTurn !== roomDetails.side) return;
-    
-    const nextTurn = roomDetails.side === 'black' ? 'red' : 'black';
+    const nextTurn = currentTurn === 'first' ? 'second' : 'first';
     setCurrentTurn(nextTurn);
-    
+
     if (connection && connection.state === signalR.HubConnectionState.Connected) {
       connection.invoke('EndTurn', roomId, nextTurn)
         .catch(err => console.error("EndTurn failed to send", err));
@@ -134,24 +112,25 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
     <div className="room-container">
       <div className="board-section">
         <button className="back-button" onClick={onBack}>← Back</button>
-        <Board
-          boardState={boardState}
-          onMove={handleMove}
-          allowedSide={roomDetails.role === 'player' && currentTurn === roomDetails.side ? roomDetails.side : 'none'}
-        />
-        {gameType === 'checkers' && roomDetails.role === 'player' && (
-          <button 
-            className="end-turn-button" 
-            onClick={endTurn}
-            disabled={currentTurn !== roomDetails.side}
-          >
-            End Turn
-          </button>
-        )}
+        {(() => {
+          const BoardComponent = GameFactory.getBoardComponent(gameType);
+          return BoardComponent ? (
+            <BoardComponent
+              roomDetails={roomDetails}
+              pendingMove={pendingMove}
+              onMoveFinished={handleMoveFinished}
+              playingSide={roomDetails.role === 'player' && currentTurn === roomDetails.side ? roomDetails.side : 'none'}
+              onEndTurn={endTurn}
+              canEndTurn={roomDetails.role === 'player' && currentTurn === roomDetails.side}
+            />
+          ) : null;
+        })()}
+
       </div>
+
       <div className="chat-section">
         <div className="chat-header">
-          {gameType === 'chess' ? '♟️ Chess' : '🔴 Checkers'} Chat | Room: {roomDetails.roomId}
+          Chat | Room: {roomDetails.roomId} ({gameType})
         </div>
         <div className="chat-messages">
           {messages.map(m => (

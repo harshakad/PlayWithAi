@@ -1,22 +1,17 @@
-using System;
-using System.Collections.Generic;
-using GamePlatform.Domain.Entities;
+using GamePlatform.Domain.Aggregates;
 using GamePlatform.Domain.Enums;
+using GamePlatform.Domain.Rules;
+using GamePlatform.Domain.ValueObjects;
 
 namespace GamePlatform.Application.Games.Checkers;
 
 public class CheckersGameService : ICheckersGameService
 {
-    private static readonly Dictionary<Guid, GameRoom> _games = new();
+    private static readonly Dictionary<Guid, GameRoom> _games = [];
 
     public GameRoom CreateGame(string name)
     {
-        var game = new GameRoom
-        {
-            Name = name,
-            Type = GameType.Checkers,
-            State = "Initial Checkers State" 
-        };
+        var game = GameRoom.CreateCheckersRoom(name, new CheckersMoveValidator());
         _games[game.Id] = game;
         return game;
     }
@@ -26,13 +21,15 @@ public class CheckersGameService : ICheckersGameService
         return _games.TryGetValue(id, out var game) ? game : throw new KeyNotFoundException("Game not found");
     }
 
-    public bool MakeMove(Guid id, string move)
+    public void JoinRoom(Guid id, string userName, Side side)
     {
-        if (_games.TryGetValue(id, out var game))
-        {
-            game.State = $"Moved {move}";
-            return true;
-        }
-        return false;
+        var game = GetGame(id);
+        game.JoinAsPlayer(userName, side);
+    }
+
+    public MoveResult MakeMove(Guid id, string playerName, Move move)
+    {
+        var game = GetGame(id);
+        return game.MakeMove(playerName, move);
     }
 }

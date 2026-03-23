@@ -5,7 +5,7 @@ import GameRoom from './components/GameRoom';
 import './App.css';
 
 export type GameType = 'chess' | 'checkers';
-export type PlayerSide = 'white' | 'black' | 'red';
+export type PlayerSide = 'first' | 'second';
 export type UserRole = 'player' | 'observer';
 
 export interface RoomDetails {

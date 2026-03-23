@@ -28,8 +28,8 @@ const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinR
   };
 
   const getSides = () => {
-    if (gameType === 'chess') return [{value: 'white', label: 'White'}, {value: 'black', label: 'Black'}];
-    if (gameType === 'checkers') return [{value: 'red', label: 'Red'}, {value: 'black', label: 'Black'}];
+    if (gameType === 'chess') return [{value: 'first', label: 'White (First)'}, {value: 'second', label: 'Black (Second)'}];
+    if (gameType === 'checkers') return [{value: 'first', label: 'Black (First)'}, {value: 'second', label: 'Red (Second)'}];
     return [];
   };
 
