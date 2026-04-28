@@ -7,6 +7,14 @@ using System.Text.Json.Serialization;
 
 namespace GamePlatform.Domain.Entities.Chess
 {
+    public enum GameOutcome
+    {
+        Ongoing,
+        WhiteCheckmate,
+        BlackCheckmate,
+        Stalemate,
+    }
+
     public class ChessGame : Game, IBoardGame
     {
         [JsonInclude]
@@ -17,6 +25,8 @@ namespace GamePlatform.Domain.Entities.Chess
         public override GameType Type => GameType.Chess;
 
         private readonly ChessMoveValidator moveValidator = new();
+
+        public GameOutcome Outcome { get; private set; } = GameOutcome.Ongoing;
 
         private static PieceColor GetSideColour(Side side) => side == Side.First ? PieceColor.White : PieceColor.Black;
 
@@ -40,8 +50,19 @@ namespace GamePlatform.Domain.Entities.Chess
             // Apply game-specific side effects (captures, promotions)
             newBoard = newBoard.ApplyPromotions(move, movedPiece);
 
-            // Check for checkmate, stalemate, etc. and update Status accordingly
-            // ...
+            // Check for checkmate, stalemate, etc. and update outcome
+            var opponentColor = movedPiece.Color == PieceColor.White ? PieceColor.Black : PieceColor.White;
+
+            if (moveValidator.IsCheckmate(newBoard, opponentColor))
+            {
+                Outcome = movedPiece.Color == PieceColor.White ? GameOutcome.WhiteCheckmate : GameOutcome.BlackCheckmate;
+                Status = GameStatus.Completed;
+            }
+            else if (moveValidator.IsStalemate(newBoard, opponentColor))
+            {
+                Outcome = GameOutcome.Stalemate;
+                Status = GameStatus.Completed;
+            }
 
             Pending = newBoard;
 
