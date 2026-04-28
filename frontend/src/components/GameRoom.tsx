@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as signalR from '@microsoft/signalr';
 import { GameFactory } from './GameFactory';
 import { MoveData } from './Board';
+import { api } from '../services/api';
 
 import './GameRoom.css';
 import { GameType, RoomDetails } from '../App';
@@ -29,10 +30,24 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
   const [currentTurn, setCurrentTurn] = useState<string>('first');
   const roomId = roomDetails.roomId;
 
+  // Fetch initial room state
+  useEffect(() => {
+    const fetchInitialState = async () => {
+      try {
+        const room = await api.getRoom(roomId);
+        const turn = room.currentTurn === 'First' ? 'first' : 'second';
+        setCurrentTurn(turn);
+      } catch (err) {
+        console.error("Failed to fetch initial room state", err);
+      }
+    };
+    fetchInitialState();
+  }, [roomId]);
+
   // Setup SignalR connection
   useEffect(() => {
     const newConnection = new signalR.HubConnectionBuilder()
-      .withUrl("http://localhost:5195/gamehub")
+      .withUrl("http://localhost:5039/gamehub")
       .withAutomaticReconnect()
       .build();
 
@@ -48,7 +63,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
     if (connection) {
       connection.start()
         .then(() => {
-          console.log('Connected to server!');
+          console.log('Connected to SignalR!');
           connection.invoke('JoinRoom', roomId, roomDetails.userName);
 
           connection.on('UserJoined', (joinedUserName: string) => {
@@ -62,7 +77,6 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
           });
 
           connection.on('ReceiveMove', (moveData: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number }) => {
-            // Apply opponent's move via prop
             setPendingMove({ ...moveData, id: Date.now() });
           });
 
@@ -73,25 +87,28 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
         })
         .catch(e => console.log('Connection failed: ', e));
     }
-  }, [connection]);
+  }, [connection, roomId, roomDetails.userName]);
 
-  const handleMoveFinished = (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => {
-    if (roomDetails.role !== 'player') return;
+  const handleMoveFinished = async (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => {
+    if (roomDetails.role !== 'player') return false;
 
-    // Broadcast via SignalR
-    if (connection && connection.state === signalR.HubConnectionState.Connected) {
-      connection.invoke('MakeMove', roomId, { sourceRow, sourceCol, targetRow, targetCol })
-        .catch(err => console.error("Move failed to send", err));
+    try {
+      await api.makeMove(roomId, roomDetails.userName, { sourceRow, sourceCol, targetRow, targetCol });
+      return true;
+    } catch (err: any) {
+      console.error("Move validation failed", err);
+      setMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: `Move failed: ${err.message}` }]);
+      return false;
     }
   };
 
-  const endTurn = () => {
-    const nextTurn = currentTurn === 'first' ? 'second' : 'first';
-    setCurrentTurn(nextTurn);
-
-    if (connection && connection.state === signalR.HubConnectionState.Connected) {
-      connection.invoke('EndTurn', roomId, nextTurn)
-        .catch(err => console.error("EndTurn failed to send", err));
+  const endTurn = async () => {
+    try {
+      await api.endTurn(roomId);
+      // The backend will broadcast the turn update via SignalR
+    } catch (err: any) {
+      console.error("EndTurn failed", err);
+      setMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: `End turn failed: ${err.message}` }]);
     }
   };
 
@@ -102,7 +119,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
     if (connection && connection.state === signalR.HubConnectionState.Connected) {
       connection.invoke('SendMessage', roomId, roomDetails.userName, inputText);
     } else {
-      setMessages([...messages, { id: Date.now(), sender: 'self', text: inputText }]); // Fallback if offline
+      setMessages([...messages, { id: Date.now(), sender: 'self', text: inputText }]);
     }
 
     setInputText('');

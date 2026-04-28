@@ -6,20 +6,15 @@ namespace GamePlatform.Domain.ValueObjects;
 /// Represents the 8x8 board state. Treated as a value object — applying a move
 /// returns a new Board instance with the mutation applied.
 /// </summary>
-public sealed class Board
+public class Board(Piece?[,] pieces)
 {
     public const int Size = 8;
 
-    private readonly Piece?[,] _squares;
+    public Piece?[,] Pieces { get; } = pieces;
 
-    private Board(Piece?[,] squares)
-    {
-        _squares = squares;
-    }
+    public Piece? GetPieceAt(BoardPosition position) => Pieces[position.Row, position.Col];
 
-    public Piece? GetPieceAt(BoardPosition square) => _squares[square.Row, square.Col];
-
-    public Piece? this[int row, int col] => _squares[row, col];
+    public Piece? this[int row, int col] => Pieces[row, col];
 
     /// <summary>
     /// Returns a new Board with the given move applied.
@@ -48,32 +43,28 @@ public sealed class Board
     /// </summary>
     public Board PromotePieceAt(BoardPosition square, PieceType newType)
     {
-        var existing = _squares[square.Row, square.Col]
+        var existing = Pieces[square.Row, square.Col]
             ?? throw new InvalidOperationException($"No piece at {square} to promote.");
         var newSquares = CloneSquares();
         newSquares[square.Row, square.Col] = new Piece(existing.Color, newType);
         return new Board(newSquares);
     }
 
-    public bool IsEmpty(BoardPosition square) => _squares[square.Row, square.Col] is null;
+    public bool IsEmpty(BoardPosition square) => Pieces[square.Row, square.Col] is null;
 
-    public bool IsInBounds(int row, int col) => row >= 0 && row < Size && col >= 0 && col < Size;
+    public static bool IsInBounds(int row, int col) => row >= 0 && row < Size && col >= 0 && col < Size;
 
     private Piece?[,] CloneSquares()
     {
         var clone = new Piece?[Size, Size];
-        Array.Copy(_squares, clone, _squares.Length);
+        Array.Copy(Pieces, clone, Pieces.Length);
         return clone;
     }
+}
 
-    // ── Factory Methods ────────────────────────────────────────
-
-    public static Board CreateEmpty()
-    {
-        return new Board(new Piece?[Size, Size]);
-    }
-
-    public static Board CreateForChess()
+public class ChessBoard(Piece?[,] squares) : Board(squares)
+{
+    public static ChessBoard CreateNew()
     {
         var squares = new Piece?[Size, Size];
 
@@ -105,10 +96,13 @@ public sealed class Board
         squares[7, 6] = new Piece(PieceColor.White, PieceType.Knight);
         squares[7, 7] = new Piece(PieceColor.White, PieceType.Rook);
 
-        return new Board(squares);
+        return new ChessBoard(squares);
     }
+}
 
-    public static Board CreateForCheckers()
+public class CheckersBoard(Piece?[,] squares) : Board(squares)
+{
+    public static CheckersBoard CreateNew()
     {
         var squares = new Piece?[Size, Size];
 
@@ -126,6 +120,6 @@ public sealed class Board
             }
         }
 
-        return new Board(squares);
+        return new CheckersBoard(squares);
     }
 }

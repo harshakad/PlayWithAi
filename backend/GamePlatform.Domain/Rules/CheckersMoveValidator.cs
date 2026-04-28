@@ -70,29 +70,4 @@ public class CheckersMoveValidator : IMoveValidator
 
         return (false, "Checkers pieces can only move 1 square or jump 2 squares diagonally.");
     }
-
-    public Board ApplySideEffects(Board boardAfterMove, Move move, Piece movedPiece)
-    {
-        int absRow = Math.Abs(move.RowDelta);
-
-        // Capture: remove the jumped piece
-        if (absRow == 2)
-        {
-            int midRow = move.From.Row + move.RowDelta / 2;
-            int midCol = move.From.Col + move.ColDelta / 2;
-            boardAfterMove = boardAfterMove.RemovePieceAt(new BoardPosition(midRow, midCol));
-        }
-
-        // Promotion: Man reaching the far row becomes a King
-        bool shouldPromote = movedPiece.Type == PieceType.Man &&
-            ((movedPiece.Color == PieceColor.Black && move.To.Row == 7) ||
-             (movedPiece.Color == PieceColor.Red && move.To.Row == 0));
-
-        if (shouldPromote)
-        {
-            boardAfterMove = boardAfterMove.PromotePieceAt(move.To, PieceType.CheckersKing);
-        }
-
-        return boardAfterMove;
-    }
 }

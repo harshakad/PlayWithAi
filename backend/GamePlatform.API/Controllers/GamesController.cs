@@ -1,52 +1,32 @@
-using GamePlatform.Domain.Enums;
-using GamePlatform.Domain.Aggregates;
-using GamePlatform.Domain.ValueObjects;
-using GamePlatform.Application.Games.Chess;
-using GamePlatform.Application.Games.Checkers;
+using GamePlatform.API.Hubs;
+using GamePlatform.Application.Games;
 using GamePlatform.Application.Interfaces;
+using GamePlatform.Domain.Enums;
+using GamePlatform.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace GamePlatform.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class GamesController : ControllerBase
+public class GamesController(IGameService gameService, IHubContext<GameHub> hubContext) : ControllerBase
 {
-    private readonly IChessGameService _chessService;
-    private readonly ICheckersGameService _checkersService;
-
-    public GamesController(IChessGameService chessService, ICheckersGameService checkersService)
-    {
-        _chessService = chessService;
-        _checkersService = checkersService;
-    }
-
-    private IGameService GetService(GameType type)
-    {
-        return type switch
-        {
-            GameType.Chess => _chessService,
-            GameType.Checkers => _checkersService,
-            _ => throw new ArgumentException("Invalid game type")
-        };
-    }
-
     [HttpPost]
-    public IActionResult CreateGame([FromQuery] GameType type, [FromBody] CreateGameDto dto)
+    [Route("Create")]
+    public IActionResult CreateGameRoom([FromQuery] GameType type, [FromBody] CreateGameDto dto)
     {
-        var service = GetService(type);
-        var game = service.CreateGame(dto.Name ?? "New Game");
-        return Ok(game);
+        var room = gameService.CreateRoom(type, dto.Name ?? $"{type} Room");
+        return Ok(room);
     }
 
-    [HttpGet("{id}")]
-    public IActionResult GetGame(Guid id, [FromQuery] GameType type)
+    [HttpGet("Get/{id}")]
+    public IActionResult GetGameRoom(Guid id)
     {
         try
         {
-            var service = GetService(type);
-            var game = service.GetGame(id);
-            return Ok(game);
+            var room = gameService.GetRoom(id);
+            return Ok(room);
         }
         catch (KeyNotFoundException)
         {
@@ -54,17 +34,64 @@ public class GamesController : ControllerBase
         }
     }
 
-    [HttpPost("{id}/move")]
-    public IActionResult MakeMove(Guid id, [FromQuery] GameType type, [FromBody] MoveDto dto)
+    [HttpPost]
+    [Route("{id}/Join")]
+    public IActionResult JoinGameRoom(Guid id, [FromQuery] string playerName, [FromQuery] Side side)
     {
         try
         {
-            var service = GetService(type);
+            var room = gameService.JoinRoom(id, playerName, side);
+            return Ok(room);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound("Game not found.");
+        }
+    }
+
+    [HttpPost]
+    [Route("{id}/Board/Move")]
+    public async Task<IActionResult> MakeMove(Guid id, [FromBody] MoveDto dto)
+    {
+        try
+        {
             var move = new Move(new BoardPosition(dto.SourceRow, dto.SourceCol), new BoardPosition(dto.TargetRow, dto.TargetCol));
-            var result = service.MakeMove(id, dto.PlayerName, move);
-            
-            if (result.IsSuccess) return Ok(result);
-            return BadRequest(result.ErrorMessage);
+            var result = gameService.MakeMove(id, dto.PlayerName, move);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result.ErrorMessage);
+            }
+
+            // Broadcast the move via SignalR
+            await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveMove", new
+            {
+                sourceRow = dto.SourceRow,
+                sourceCol = dto.SourceCol,
+                targetRow = dto.TargetRow,
+                targetCol = dto.TargetCol
+            });
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost]
+    [Route("{id}/EndTurn")]
+    public async Task<IActionResult> EndTurn(Guid id)
+    {
+        try
+        {
+            var result = gameService.EndTurn(id);
+            var room = gameService.GetRoom(id);
+
+            // Broadcast turn update via SignalR
+            await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveTurnUpdate", room.CurrentTurn == Side.First ? "first" : "second");
+
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -73,9 +100,13 @@ public class GamesController : ControllerBase
     }
 }
 
-public class CreateGameDto { public string? Name { get; set; } }
-public class MoveDto 
-{ 
+public class CreateGameDto
+{
+    public string? Name { get; set; }
+}
+
+public class MoveDto
+{
     public string PlayerName { get; set; } = string.Empty;
     public int SourceRow { get; set; }
     public int SourceCol { get; set; }

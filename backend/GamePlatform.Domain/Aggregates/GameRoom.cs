@@ -14,45 +14,27 @@ public class GameRoom
 {
     public Guid Id { get; private set; }
     public string Name { get; private set; }
-    public GameType Type { get; private set; }
-    public GameStatus Status { get; private set; }
+
     public Side CurrentTurn { get; private set; }
-    public Board Board { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
 
     private readonly List<Player> _players = [];
     public IReadOnlyList<Player> Players => _players.AsReadOnly();
 
-    private readonly List<Move> _moveHistory = [];
-    public IReadOnlyList<Move> MoveHistory => _moveHistory.AsReadOnly();
+    public IGame Game { get; private set; }
 
-    private readonly IMoveValidator _moveValidator;
-
-    // ── Factory Methods ────────────────────────────────────────
-
-    public static GameRoom CreateChessRoom(string name, IMoveValidator moveValidator)
-    {
-        return new GameRoom(name, GameType.Chess, Board.CreateForChess(), Side.First, moveValidator);
-    }
-
-    public static GameRoom CreateCheckersRoom(string name, IMoveValidator moveValidator)
-    {
-        return new GameRoom(name, GameType.Checkers, Board.CreateForCheckers(), Side.First, moveValidator);
-    }
-
-    private GameRoom(string name, GameType type, Board board, Side startingTurn, IMoveValidator moveValidator)
+    public GameRoom(string name, Side startingTurn, IGame game)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new GameDomainException("Room name cannot be empty.");
 
         Id = Guid.NewGuid();
         Name = name;
-        Type = type;
-        Board = board;
+
         CurrentTurn = startingTurn;
-        Status = GameStatus.WaitingForPlayers;
         CreatedAt = DateTime.UtcNow;
-        _moveValidator = moveValidator ?? throw new ArgumentNullException(nameof(moveValidator));
+        Game = game;
     }
 
     // ── Behaviors ──────────────────────────────────────────────
@@ -66,8 +48,8 @@ public class GameRoom
     /// </summary>
     public void JoinAsPlayer(string userName, Side side)
     {
-        if (Status != GameStatus.WaitingForPlayers && Status != GameStatus.InProgress)
-            throw new GameDomainException("Cannot join a game that is completed or abandoned.");
+        if (!Game.IsJoinable)
+            throw new GameDomainException("Cannot join a game that is started, completed or abandoned.");
 
         if (_players.Count >= 2)
             throw new GameDomainException("Room is full. Maximum 2 players.");
@@ -84,7 +66,7 @@ public class GameRoom
 
         if (_players.Count == 2)
         {
-            Status = GameStatus.InProgress;
+            Game.StartGame();
         }
     }
 
@@ -96,7 +78,7 @@ public class GameRoom
     public MoveResult MakeMove(string playerName, Move move)
     {
         // Invariant: game must be in progress
-        if (Status != GameStatus.InProgress)
+        if (Game.Status != GameStatus.InProgress)
             return MoveResult.Failure("Game is not in progress.");
 
         // Invariant: player must exist in this room
@@ -108,62 +90,19 @@ public class GameRoom
         if (player.Side != CurrentTurn)
             return MoveResult.Failure("It is not your turn.");
 
-        // Map player Side → PieceColor for the validator
-        var movingColor = SideToPieceColor(player.Side, Type);
-
-        // Delegate to game-specific validator
-        var (isValid, reason) = _moveValidator.Validate(Board, move, movingColor);
-        if (!isValid)
-            return MoveResult.Failure(reason!);
-
-        // Get the piece before moving (for side effects like promotion)
-        var movedPiece = Board.GetPieceAt(move.From)!;
-
-        // Apply the basic move
-        var newBoard = Board.ApplyMove(move);
-
-        // Apply game-specific side effects (captures, promotions)
-        newBoard = _moveValidator.ApplySideEffects(newBoard, move, movedPiece);
-
-        Board = newBoard;
-        _moveHistory.Add(move);
-
-        // Advance the turn
-        var nextTurn = GetNextTurn();
-        CurrentTurn = nextTurn;
-
-        return MoveResult.Success(Board, nextTurn);
+        return Game.MakeMove(CurrentTurn, move);
     }
 
-    /// <summary>
-    /// Marks the game as completed.
-    /// </summary>
-    public void CompleteGame()
+    public MoveResult EndTurn()
     {
-        if (Status != GameStatus.InProgress)
-            throw new GameDomainException("Can only complete a game that is in progress.");
+        var result = Game.EndTurn();
+        CurrentTurn = GetNextTurn();
+        return result;
 
-        Status = GameStatus.Completed;
-    }
-
-    /// <summary>
-    /// Marks the game as abandoned.
-    /// </summary>
-    public void AbandonGame()
-    {
-        if (Status == GameStatus.Completed)
-            throw new GameDomainException("Cannot abandon a completed game.");
-
-        Status = GameStatus.Abandoned;
+        Side GetNextTurn() => CurrentTurn == Side.First ? Side.Second : Side.First;
     }
 
     // ── Private Helpers ────────────────────────────────────────
-
-    private Side GetNextTurn()
-    {
-        return CurrentTurn == Side.First ? Side.Second : Side.First;
-    }
-
     private void ValidateSideForGameType(Side side)
     {
         // For now, both games use First and Second
@@ -171,15 +110,5 @@ public class GameRoom
 
         if (!validSides.Contains(side))
             throw new GameDomainException($"Side '{side}' is not valid.");
-    }
-
-    private static PieceColor SideToPieceColor(Side side, GameType gameType)
-    {
-        return gameType switch
-        {
-            GameType.Chess => side == Side.First ? PieceColor.White : PieceColor.Black,
-            GameType.Checkers => side == Side.First ? PieceColor.Black : PieceColor.Red,
-            _ => throw new GameDomainException("Unsupported game type.")
-        };
     }
 }

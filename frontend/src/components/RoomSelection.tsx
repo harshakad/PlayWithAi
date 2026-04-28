@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './RoomSelection.css';
 import { GameType, RoomDetails, PlayerSide, UserRole } from '../App';
+import { api } from '../services/api';
 
 interface RoomSelectionProps {
   gameType: GameType;
@@ -9,22 +10,46 @@ interface RoomSelectionProps {
 }
 
 const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinRoom }) => {
+  const [isNewRoom, setIsNewRoom] = useState(true);
   const [roomId, setRoomId] = useState('');
   const [userName, setUserName] = useState('');
   const [role, setRole] = useState<UserRole>('player');
   const [side, setSide] = useState<PlayerSide | ''>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomId || !userName) return;
+    setError(null);
+    if (!isNewRoom && !roomId) return;
+    if (!userName) return;
     if (role === 'player' && !side) return;
 
-    onJoinRoom({
-      roomId,
-      userName,
-      role,
-      side: role === 'player' ? side as PlayerSide : undefined,
-    });
+    setLoading(true);
+    try {
+      let finalRoomId = roomId;
+
+      if (isNewRoom) {
+        const room = await api.createRoom(gameType === 'chess' ? 'Chess' : 'Checkers', `${userName}'s Room`);
+        finalRoomId = room.id;
+      }
+
+      if (role === 'player') {
+        const sideParam = side === 'first' ? 'First' : 'Second';
+        await api.joinRoom(finalRoomId, userName, sideParam);
+      }
+
+      onJoinRoom({
+        roomId: finalRoomId,
+        userName,
+        role,
+        side: role === 'player' ? side as PlayerSide : undefined,
+      });
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getSides = () => {
@@ -37,16 +62,28 @@ const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinR
     <div className="room-setup-container">
       <div className="glass-panel">
         <button className="back-button" onClick={onBack}>← Back</button>
-        <h2 className="setup-title">Join a {gameType === 'chess' ? 'Chess' : 'Checkers'} Game</h2>
+        <h2 className="setup-title">{isNewRoom ? 'Create' : 'Join'} a {gameType === 'chess' ? 'Chess' : 'Checkers'} Game</h2>
+        
+        <div className="tab-group">
+          <button className={isNewRoom ? 'active' : ''} onClick={() => setIsNewRoom(true)}>New Room</button>
+          <button className={!isNewRoom ? 'active' : ''} onClick={() => setIsNewRoom(false)}>Join Existing</button>
+        </div>
+
+        {error && <div className="error-message">{error}</div>}
+
         <form className="setup-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Name</label>
+            <label>Your Name</label>
             <input type="text" placeholder="Enter your name" value={userName} onChange={e => setUserName(e.target.value)} required />
           </div>
-          <div className="form-group">
-            <label>Room ID</label>
-            <input type="text" placeholder="Enter Room ID to join or create new" value={roomId} onChange={e => setRoomId(e.target.value)} required />
-          </div>
+          
+          {!isNewRoom && (
+            <div className="form-group">
+              <label>Room ID</label>
+              <input type="text" placeholder="Paste Room ID here" value={roomId} onChange={e => setRoomId(e.target.value)} required />
+            </div>
+          )}
+
           <div className="form-group row-group">
             <label>Role</label>
             <div className="radio-group">
@@ -73,7 +110,9 @@ const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinR
               </div>
             </div>
           )}
-          <button type="submit" className="primary-action-button" disabled={!roomId || !userName || (role === 'player' && !side)}>Enter Room</button>
+          <button type="submit" className="primary-action-button" disabled={loading || (!isNewRoom && !roomId) || !userName || (role === 'player' && !side)}>
+            {loading ? 'Processing...' : isNewRoom ? 'Create & Join' : 'Join Room'}
+          </button>
         </form>
       </div>
     </div>

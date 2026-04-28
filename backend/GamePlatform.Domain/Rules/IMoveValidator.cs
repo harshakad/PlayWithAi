@@ -14,11 +14,4 @@ public interface IMoveValidator
     /// Returns (isValid, errorReason).
     /// </summary>
     (bool IsValid, string? Reason) Validate(Board board, Move move, PieceColor movingColor);
-
-    /// <summary>
-    /// Applies any side effects for a valid move (e.g. captures, promotions)
-    /// and returns the resulting board.
-    /// The basic "move piece from A to B" is already applied before this is called.
-    /// </summary>
-    Board ApplySideEffects(Board boardAfterMove, Move move, Piece movedPiece);
 }

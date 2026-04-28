@@ -6,8 +6,13 @@ namespace GamePlatform.Application.Interfaces;
 
 public interface IGameService
 {
-    GameRoom CreateGame(string name);
-    GameRoom GetGame(Guid id);
-    void JoinRoom(Guid id, string userName, Side side);
+    GameRoom CreateRoom(GameType type, string name);
+
+    GameRoom GetRoom(Guid id);
+
+    GameRoom JoinRoom(Guid id, string userName, Side side);
+
     MoveResult MakeMove(Guid id, string playerName, Move move);
+
+    MoveResult EndTurn(Guid id);
 }

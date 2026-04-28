@@ -15,7 +15,7 @@ export interface MoveData {
 export interface BoardProps {
   roomDetails: RoomDetails;
   pendingMove?: MoveData | null;
-  onMoveFinished?: (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => void;
+  onMoveFinished?: (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => Promise<boolean>;
   playingSide?: string;
   onEndTurn?: () => void;
   canEndTurn?: boolean;

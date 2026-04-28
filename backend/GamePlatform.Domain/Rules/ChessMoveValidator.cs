@@ -38,23 +38,6 @@ public class ChessMoveValidator : IMoveValidator
         return valid;
     }
 
-    public Board ApplySideEffects(Board boardAfterMove, Move move, Piece movedPiece)
-    {
-        // Pawn promotion: if a pawn reaches the far rank, promote to Queen
-        if (movedPiece.Type == PieceType.Pawn)
-        {
-            bool isPromotion = (movedPiece.Color == PieceColor.White && move.To.Row == 0)
-                            || (movedPiece.Color == PieceColor.Black && move.To.Row == 7);
-
-            if (isPromotion)
-            {
-                boardAfterMove = boardAfterMove.PromotePieceAt(move.To, PieceType.Queen);
-            }
-        }
-
-        return boardAfterMove;
-    }
-
     // ── Piece-Specific Validation ──────────────────────────────
 
     private static (bool, string?) ValidatePawnMove(Board board, Move move, Piece pawn)

@@ -5,7 +5,7 @@ import { MoveData } from './Board';
 export function useBoard(
   generateInitialBoard: () => (GamePiece | null)[][],
   pendingMove?: MoveData | null,
-  onMoveFinished?: (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => void,
+  onMoveFinished?: (sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) => Promise<boolean>,
   allowedSide?: string
 ) {
   const [board, setBoard] = useState<(GamePiece | null)[][]>(generateInitialBoard);
@@ -17,6 +17,7 @@ export function useBoard(
       lastProcessedMoveId.current = pendingMove.id;
       const { sourceRow, sourceCol, targetRow, targetCol } = pendingMove;
       setBoard(prev => {
+        if (!prev[sourceRow][sourceCol]) return prev;
         const newBoard = prev.map(row => [...row]);
         newBoard[targetRow][targetCol] = newBoard[sourceRow][sourceCol];
         newBoard[sourceRow][sourceCol] = null;
@@ -74,15 +75,30 @@ export function useBoard(
     }, 0);
   }, [board, allowedSide]);
 
-  const handleDrop = useCallback((e: React.DragEvent, targetRow: number, targetCol: number) => {
+  const handleDrop = useCallback(async (e: React.DragEvent, targetRow: number, targetCol: number) => {
     e.preventDefault();
     const sourceRow = parseInt(e.dataTransfer.getData('sourceRow'), 10);
     const sourceCol = parseInt(e.dataTransfer.getData('sourceCol'), 10);
     if (sourceRow === targetRow && sourceCol === targetCol) return;
 
-    applyMove(sourceRow, sourceCol, targetRow, targetCol);
-    onMoveFinished?.(sourceRow, sourceCol, targetRow, targetCol);
-  }, [applyMove, onMoveFinished]);
+    let previousBoard: (GamePiece | null)[][] = [];
+    
+    // Optimistic update
+    setBoard(prev => {
+        previousBoard = prev; // Capture the previous state
+        const newBoard = prev.map(row => [...row]);
+        newBoard[targetRow][targetCol] = newBoard[sourceRow][sourceCol];
+        newBoard[sourceRow][sourceCol] = null;
+        return newBoard;
+    });
+
+    // Call validation
+    const success = await onMoveFinished?.(sourceRow, sourceCol, targetRow, targetCol);
+    if (success === false) {
+      // Revert if failed
+      setBoard(previousBoard);
+    }
+  }, [onMoveFinished]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
