@@ -25,13 +25,6 @@ const ChessBoard: React.FC<ChessBoardProps> = (props) => {
         {...props}
         generateInitialBoard={generateInitialBoard}
       />
-      <button
-        className="end-turn-button"
-        onClick={() => props.onEndTurn?.()}
-        disabled={!props.canEndTurn}
-      >
-        End Turn
-      </button>
     </>
   );
 };

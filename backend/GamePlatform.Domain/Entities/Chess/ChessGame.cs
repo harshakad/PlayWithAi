@@ -53,22 +53,27 @@ namespace GamePlatform.Domain.Entities.Chess
             // Check for checkmate, stalemate, etc. and update outcome
             var opponentColor = movedPiece.Color == PieceColor.White ? PieceColor.Black : PieceColor.White;
 
+            (var isGameOver, var gameOverReason) = (false, "");
             if (moveValidator.IsCheckmate(newBoard, opponentColor))
             {
                 Outcome = movedPiece.Color == PieceColor.White ? GameOutcome.WhiteCheckmate : GameOutcome.BlackCheckmate;
                 Status = GameStatus.Completed;
+                isGameOver = true;
+                gameOverReason = "Checkmate";
             }
             else if (moveValidator.IsStalemate(newBoard, opponentColor))
             {
                 Outcome = GameOutcome.Stalemate;
                 Status = GameStatus.Completed;
+                isGameOver = true;
+                gameOverReason = "Stalemate";
             }
 
             Pending = newBoard;
 
             _moveHistory.Add(move);
 
-            return MoveResult.Success(Pending);
+            return MoveResult.Success(Pending, isGameOver, gameOverReason);
         }
 
         public override MoveResult EndTurn()

@@ -28,7 +28,18 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
 
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
   const [currentTurn, setCurrentTurn] = useState<string>('first');
+  const [gameOver, setGameOver] = useState<{ isOver: boolean; reason?: string }>({ isOver: false });
   const roomId = roomDetails.roomId;
+
+  const handleGameOver = (isGameOver: boolean, reason?: string) => {
+    if (isGameOver) {
+      setGameOver({ isOver: true, reason });
+      setMessages(prev => [
+        ...prev,
+        { id: Date.now(), sender: 'system', text: `GAME OVER: ${reason || 'The game has ended.'}` }
+      ]);
+    }
+  };
 
   // Fetch initial room state
   useEffect(() => {
@@ -76,8 +87,11 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
             setMessages(prev => [...prev, { id: Date.now(), sender: sender === roomDetails.userName ? 'self' : sender, text: message }]);
           });
 
-          connection.on('ReceiveMove', (moveData: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number }) => {
+          connection.on('ReceiveMove', (moveData: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number, isGameOver?: boolean, gameOverReason?: string }) => {
             setPendingMove({ ...moveData, id: Date.now() });
+            if (moveData.isGameOver) {
+              handleGameOver(true, moveData.gameOverReason);
+            }
           });
 
           connection.on('ReceiveTurnUpdate', (nextTurn: string) => {
@@ -93,7 +107,12 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
     if (roomDetails.role !== 'player') return false;
 
     try {
-      await api.makeMove(roomId, roomDetails.userName, { sourceRow, sourceCol, targetRow, targetCol });
+      const result = await api.makeMove(roomId, roomDetails.userName, { sourceRow, sourceCol, targetRow, targetCol });
+      if (result.isGameOver) {
+        handleGameOver(true, result.gameOverReason);
+      } else if (gameType === 'chess') {
+        await endTurn();
+      }
       return true;
     } catch (err: any) {
       console.error("Move validation failed", err);
@@ -104,7 +123,10 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
 
   const endTurn = async () => {
     try {
-      await api.endTurn(roomId);
+      const result = await api.endTurn(roomId);
+      if (result.isGameOver) {
+        handleGameOver(true, result.gameOverReason);
+      }
       // The backend will broadcast the turn update via SignalR
     } catch (err: any) {
       console.error("EndTurn failed", err);
@@ -138,11 +160,20 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
               onMoveFinished={handleMoveFinished}
               playingSide={roomDetails.role === 'player' && currentTurn === roomDetails.side ? roomDetails.side : 'none'}
               onEndTurn={endTurn}
-              canEndTurn={roomDetails.role === 'player' && currentTurn === roomDetails.side}
+              canEndTurn={roomDetails.role === 'player' && currentTurn === roomDetails.side && !gameOver.isOver}
             />
           ) : null;
         })()}
 
+        {gameOver.isOver && (
+          <div className="game-over-overlay">
+            <div className="game-over-content">
+              <h2>Game Over</h2>
+              <p>{gameOver.reason || 'The game has ended.'}</p>
+              <button onClick={onBack}>Back to Lobby</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="chat-section">

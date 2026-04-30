@@ -1,5 +1,12 @@
 const BASE_URL = 'http://localhost:5039/api';
 
+export interface MoveResult {
+  isSuccess: boolean;
+  errorMessage?: string;
+  isGameOver: boolean;
+  gameOverReason?: string;
+}
+
 export const api = {
   createRoom: async (type: string, name: string) => {
     const response = await fetch(`${BASE_URL}/Games/Create?type=${type}`, {
@@ -28,7 +35,7 @@ export const api = {
     return response.json();
   },
 
-  makeMove: async (roomId: string, playerName: string, move: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number }) => {
+  makeMove: async (roomId: string, playerName: string, move: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number }): Promise<MoveResult> => {
     const response = await fetch(`${BASE_URL}/Games/${roomId}/Board/Move`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -41,7 +48,7 @@ export const api = {
     return response.json();
   },
 
-  endTurn: async (roomId: string) => {
+  endTurn: async (roomId: string): Promise<MoveResult> => {
     const response = await fetch(`${BASE_URL}/Games/${roomId}/EndTurn`, {
       method: 'POST'
     });
@@ -52,3 +59,4 @@ export const api = {
     return response.json();
   }
 };
+

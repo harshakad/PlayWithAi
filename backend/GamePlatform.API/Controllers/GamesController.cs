@@ -68,7 +68,9 @@ public class GamesController(IGameService gameService, IHubContext<GameHub> hubC
                 sourceRow = dto.SourceRow,
                 sourceCol = dto.SourceCol,
                 targetRow = dto.TargetRow,
-                targetCol = dto.TargetCol
+                targetCol = dto.TargetCol,
+                isGameOver = result.IsGameOver,
+                gameOverReason = result.GameOverReason
             });
 
             return Ok(result);
@@ -90,6 +92,14 @@ public class GamesController(IGameService gameService, IHubContext<GameHub> hubC
 
             // Broadcast turn update via SignalR
             await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveTurnUpdate", room.CurrentTurn == Side.First ? "first" : "second");
+
+            if (result.IsGameOver) {
+                await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveMove", new
+                {
+                    isGameOver = result.IsGameOver,
+                    gameOverReason = result.GameOverReason
+                });
+            }
 
             return Ok(result);
         }

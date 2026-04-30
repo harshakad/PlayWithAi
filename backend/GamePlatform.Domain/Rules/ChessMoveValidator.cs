@@ -27,7 +27,7 @@ public class ChessMoveValidator : IMoveValidator
         if (target?.Type == PieceType.King)
             return (false, "Cannot capture the king.");
 
-        var valid = piece.Type switch
+        var (isValid, reason) = piece.Type switch
         {
             PieceType.Pawn => ValidatePawnMove(board, move, piece),
             PieceType.Rook => ValidateRookMove(board, move),
@@ -38,15 +38,15 @@ public class ChessMoveValidator : IMoveValidator
             _ => (false, "Unknown piece type.")
         };
 
-        if (!valid.Item1)
-            return valid;
+        if (!isValid)
+            return (false, reason);
 
         // After applying the move, verify that the moving player's king is not in check
         var boardAfterMove = board.ApplyMove(move);
         if (IsKingInCheck(boardAfterMove, movingColor))
             return (false, "Your king would be in check.");
 
-        return valid;
+        return (true, null);
     }
 
     // ── Piece-Specific Validation ──────────────────────────────
@@ -215,8 +215,8 @@ public class ChessMoveValidator : IMoveValidator
             return false;
 
         // Cannot "attack" the opponent's king (kings don't capture each other in check detection)
-        if (target?.Type == PieceType.King)
-            return false;
+        //if (target?.Type == PieceType.King)
+        //    return false;
 
         var canAttack = attackingPiece.Type switch
         {
