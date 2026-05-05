@@ -16,6 +16,7 @@ public class GameRoom
     public string Name { get; private set; }
 
     public Side CurrentTurn { get; private set; }
+    public bool IsPlayingAgainstAi { get; private set; }
 
     public DateTime CreatedAt { get; private set; }
 
@@ -111,4 +112,6 @@ public class GameRoom
         if (!validSides.Contains(side))
             throw new GameDomainException($"Side '{side}' is not valid.");
     }
+
+    public void PlayAgainstAi() => IsPlayingAgainstAi = true;
 }

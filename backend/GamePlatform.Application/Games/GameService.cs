@@ -11,10 +11,16 @@ public class GameService : IGameService
 {
     private static readonly ConcurrentDictionary<Guid, GameRoom> rooms = [];
 
-    public GameRoom CreateRoom(GameType type, string name)
+    public IReadOnlyCollection<GameRoom> GameRooms => rooms.Values.ToList().AsReadOnly();
+
+    public GameRoom CreateRoom(GameType type, string name, bool isAgainstAi = false)
     {
         var room = GameFactory.CreateRoom(type, name);
         room = rooms.GetOrAdd(room.Id, room);
+        if (isAgainstAi)
+        {
+            room.PlayAgainstAi();
+        }
         return room;
     }
 

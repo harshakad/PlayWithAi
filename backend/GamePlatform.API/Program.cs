@@ -1,9 +1,17 @@
 using GamePlatform.API.Hubs;
 using GamePlatform.Application;
+using GamePlatform.Infrastructure;
 using Microsoft.OpenApi;
 using System.Text.Json.Serialization;
+using Serilog;
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -13,6 +21,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddApplication();
+builder.Services.AddInfrastructure();
 builder.Services.AddSignalR();
 builder.Services.AddCors(options =>
 {
@@ -42,4 +51,11 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<GameHub>("/gamehub");
 
-app.Run();
+try
+{
+    app.Run();
+}
+finally
+{
+    Log.CloseAndFlush();
+}

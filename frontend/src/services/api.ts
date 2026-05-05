@@ -8,11 +8,11 @@ export interface MoveResult {
 }
 
 export const api = {
-  createRoom: async (type: string, name: string) => {
+  createRoom: async (type: string, name: string, playAgainstAi: boolean = false) => {
     const response = await fetch(`${BASE_URL}/Games/Create?type=${type}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name, isAgainstAi: playAgainstAi })
     });
     if (!response.ok) throw new Error('Failed to create room');
     return response.json();

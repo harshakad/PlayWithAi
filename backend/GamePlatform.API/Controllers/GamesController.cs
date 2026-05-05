@@ -14,9 +14,13 @@ public class GamesController(IGameService gameService, IHubContext<GameHub> hubC
 {
     [HttpPost]
     [Route("Create")]
-    public IActionResult CreateGameRoom([FromQuery] GameType type, [FromBody] CreateGameDto dto)
+    public async Task<IActionResult> CreateGameRoom([FromQuery] GameType type, [FromBody] CreateGameDto dto)
     {
-        var room = gameService.CreateRoom(type, dto.Name ?? $"{type} Room");
+        var room = gameService.CreateRoom(type, dto.Name ?? $"{type} Room", dto.IsAgainstAi);
+
+        // Notify all clients about the new room, specifically for the AI agent to join if needed
+        await hubContext.Clients.All.SendAsync("RoomCreated", room.Id, type, dto.IsAgainstAi);
+
         return Ok(room);
     }
 
@@ -36,11 +40,12 @@ public class GamesController(IGameService gameService, IHubContext<GameHub> hubC
 
     [HttpPost]
     [Route("{id}/Join")]
-    public IActionResult JoinGameRoom(Guid id, [FromQuery] string playerName, [FromQuery] Side side)
+    public async Task<IActionResult> JoinGameRoom(Guid id, [FromQuery] string playerName, [FromQuery] Side side)
     {
         try
         {
             var room = gameService.JoinRoom(id, playerName, side);
+
             return Ok(room);
         }
         catch (KeyNotFoundException)
@@ -63,7 +68,7 @@ public class GamesController(IGameService gameService, IHubContext<GameHub> hubC
             }
 
             // Broadcast the move via SignalR
-            await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveMove", new
+            await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveMove", id.ToString(), dto.PlayerName, new
             {
                 sourceRow = dto.SourceRow,
                 sourceCol = dto.SourceCol,
@@ -91,10 +96,12 @@ public class GamesController(IGameService gameService, IHubContext<GameHub> hubC
             var room = gameService.GetRoom(id);
 
             // Broadcast turn update via SignalR
-            await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveTurnUpdate", room.CurrentTurn == Side.First ? "first" : "second");
+            var nextPlayer = room.Players.FirstOrDefault(p => p.Side == room.CurrentTurn)?.UserName ?? room.CurrentTurn.ToString();
+            await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveTurnUpdate", id.ToString(), nextPlayer, room.CurrentTurn == Side.First ? "first" : "second");
 
-            if (result.IsGameOver) {
-                await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveMove", new
+            if (result.IsGameOver)
+            {
+                await hubContext.Clients.Group(id.ToString()).SendAsync("ReceiveMove", id.ToString(), "System", new
                 {
                     isGameOver = result.IsGameOver,
                     gameOverReason = result.GameOverReason
@@ -113,6 +120,7 @@ public class GamesController(IGameService gameService, IHubContext<GameHub> hubC
 public class CreateGameDto
 {
     public string? Name { get; set; }
+    public bool IsAgainstAi { get; set; }
 }
 
 public class MoveDto

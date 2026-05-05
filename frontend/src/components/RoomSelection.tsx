@@ -16,6 +16,7 @@ const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinR
   const [role, setRole] = useState<UserRole>('player');
   const [side, setSide] = useState<PlayerSide | ''>('');
   const [loading, setLoading] = useState(false);
+  const [playAgainstAi, setPlayAgainstAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,7 +31,7 @@ const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinR
       let finalRoomId = roomId;
 
       if (isNewRoom) {
-        const room = await api.createRoom(gameType === 'chess' ? 'Chess' : 'Checkers', `${userName}'s Room`);
+        const room = await api.createRoom(gameType === 'chess' ? 'Chess' : 'Checkers', `${userName}'s Room`, playAgainstAi);
         finalRoomId = room.id;
       }
 
@@ -53,8 +54,8 @@ const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinR
   };
 
   const getSides = () => {
-    if (gameType === 'chess') return [{value: 'first', label: 'White (First)'}, {value: 'second', label: 'Black (Second)'}];
-    if (gameType === 'checkers') return [{value: 'first', label: 'Black (First)'}, {value: 'second', label: 'Red (Second)'}];
+    if (gameType === 'chess') return [{ value: 'first', label: 'White (First)' }, { value: 'second', label: 'Black (Second)' }];
+    if (gameType === 'checkers') return [{ value: 'first', label: 'Black (First)' }, { value: 'second', label: 'Red (Second)' }];
     return [];
   };
 
@@ -63,7 +64,7 @@ const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinR
       <div className="glass-panel">
         <button className="back-button" onClick={onBack}>← Back</button>
         <h2 className="setup-title">{isNewRoom ? 'Create' : 'Join'} a {gameType === 'chess' ? 'Chess' : 'Checkers'} Game</h2>
-        
+
         <div className="tab-group">
           <button className={isNewRoom ? 'active' : ''} onClick={() => setIsNewRoom(true)}>New Room</button>
           <button className={!isNewRoom ? 'active' : ''} onClick={() => setIsNewRoom(false)}>Join Existing</button>
@@ -76,11 +77,23 @@ const RoomSelection: React.FC<RoomSelectionProps> = ({ gameType, onBack, onJoinR
             <label>Your Name</label>
             <input type="text" placeholder="Enter your name" value={userName} onChange={e => setUserName(e.target.value)} required />
           </div>
-          
+
           {!isNewRoom && (
             <div className="form-group">
               <label>Room ID</label>
               <input type="text" placeholder="Paste Room ID here" value={roomId} onChange={e => setRoomId(e.target.value)} required />
+            </div>
+          )}
+
+          {isNewRoom && (
+            <div className="form-group row-group">
+              <label>Game Mode</label>
+              <div className="checkbox-group">
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={playAgainstAi} onChange={e => setPlayAgainstAi(e.target.checked)} />
+                  Play against AI
+                </label>
+              </div>
             </div>
           )}
 

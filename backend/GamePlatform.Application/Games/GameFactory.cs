@@ -1,4 +1,4 @@
-﻿using GamePlatform.Application.Interfaces;
+using GamePlatform.Application.Interfaces;
 using GamePlatform.Domain.Aggregates;
 using GamePlatform.Domain.Entities.Checkers;
 using GamePlatform.Domain.Entities.Chess;

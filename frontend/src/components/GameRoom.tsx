@@ -77,26 +77,36 @@ const GameRoom: React.FC<GameRoomProps> = ({ gameType, roomDetails, onBack }) =>
           console.log('Connected to SignalR!');
           connection.invoke('JoinRoom', roomId, roomDetails.userName);
 
-          connection.on('UserJoined', (joinedUserName: string) => {
-            if (joinedUserName !== roomDetails.userName) {
+          connection.on('UserJoined', (msgRoomId: string, joinedUserName: string) => {
+            if (msgRoomId === roomId) {
               setMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: `${joinedUserName} has joined the room.` }]);
             }
           });
 
-          connection.on('ReceiveMessage', (sender: string, message: string) => {
-            setMessages(prev => [...prev, { id: Date.now(), sender: sender === roomDetails.userName ? 'self' : sender, text: message }]);
-          });
-
-          connection.on('ReceiveMove', (moveData: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number, isGameOver?: boolean, gameOverReason?: string }) => {
-            setPendingMove({ ...moveData, id: Date.now() });
-            if (moveData.isGameOver) {
-              handleGameOver(true, moveData.gameOverReason);
+          connection.on('ReceiveMessage', (msgRoomId: string, sender: string, message: string) => {
+            if (msgRoomId === roomId) {
+              setMessages(prev => [...prev, { id: Date.now(), sender: sender === roomDetails.userName ? 'self' : sender, text: message }]);
             }
           });
 
-          connection.on('ReceiveTurnUpdate', (nextTurn: string) => {
-            setCurrentTurn(nextTurn);
-            setMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: `It is now ${nextTurn}'s turn.` }]);
+          connection.on('ReceiveMove', (msgRoomId: string, userName: string, moveData: { sourceRow: number, sourceCol: number, targetRow: number, targetCol: number, isGameOver?: boolean, gameOverReason?: string }) => {
+            if (msgRoomId === roomId) {
+              setPendingMove({ ...moveData, id: Date.now() });
+              if (moveData.isGameOver) {
+                handleGameOver(true, moveData.gameOverReason);
+              }
+              // Optional: Add a chat message about the move
+              if (userName !== roomDetails.userName && userName !== 'System') {
+                setMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: `${userName} has made a move.` }]);
+              }
+            }
+          });
+
+          connection.on('ReceiveTurnUpdate', (msgRoomId: string, userName: string, nextTurn: string) => {
+            if (msgRoomId === roomId) {
+              setCurrentTurn(nextTurn);
+              setMessages(prev => [...prev, { id: Date.now(), sender: 'system', text: `It is now ${userName}'s turn (${nextTurn}).` }]);
+            }
           });
         })
         .catch(e => console.log('Connection failed: ', e));

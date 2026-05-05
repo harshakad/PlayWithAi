@@ -10,18 +10,21 @@ public class Player
     public string UserName { get; }
     public Side Side { get; }
 
-    public Player(string userName, Side side)
+    public bool IsAI { get; }
+
+    public Player(string userName, Side side, bool isAI = false)
     {
         if (string.IsNullOrWhiteSpace(userName))
             throw new ArgumentException("Username cannot be empty.", nameof(userName));
 
         UserName = userName;
+        IsAI = isAI;
         Side = side;
     }
 
     // Equality by UserName within a room context
     public override bool Equals(object? obj) =>
-        obj is Player other && UserName == other.UserName;
+        obj is Player other && UserName == other.UserName && IsAI == other.IsAI;
 
-    public override int GetHashCode() => UserName.GetHashCode();
+    public override int GetHashCode() => HashCode.Combine(UserName, IsAI);
 }

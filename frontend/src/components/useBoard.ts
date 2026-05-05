@@ -17,7 +17,8 @@ export function useBoard(
       lastProcessedMoveId.current = pendingMove.id;
       const { sourceRow, sourceCol, targetRow, targetCol } = pendingMove;
       setBoard(prev => {
-        if (!prev[sourceRow][sourceCol]) return prev;
+        if (sourceRow === undefined || sourceCol === undefined) return prev;
+        if (!prev[sourceRow] || !prev[sourceRow][sourceCol]) return prev;
         const newBoard = prev.map(row => [...row]);
         newBoard[targetRow][targetCol] = newBoard[sourceRow][sourceCol];
         newBoard[sourceRow][sourceCol] = null;

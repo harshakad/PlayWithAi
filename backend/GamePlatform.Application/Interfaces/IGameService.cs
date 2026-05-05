@@ -6,7 +6,9 @@ namespace GamePlatform.Application.Interfaces;
 
 public interface IGameService
 {
-    GameRoom CreateRoom(GameType type, string name);
+    IReadOnlyCollection<GameRoom> GameRooms { get; }
+
+    GameRoom CreateRoom(GameType type, string name, bool isAgainstAi = false);
 
     GameRoom GetRoom(Guid id);
 
