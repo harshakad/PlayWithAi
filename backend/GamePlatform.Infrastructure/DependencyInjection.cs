@@ -7,7 +7,7 @@ namespace GamePlatform.Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services)
         {
-            services.AddHostedService<ChessAgent>();
+            services.AddHostedService<ChessAgentHostedService>();
             return services;
         }
     }
